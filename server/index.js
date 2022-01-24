@@ -70,7 +70,7 @@ io.on('connect', (socket) => {
 
   socket.on('sendMessage', (message, callback) => {
     const user = getUser(socket.id);
-    const msg = new Msg({msg:message, author:user.id, room: user.room});
+    const msg = new Msg({msg:message, author:user.name, room: user.room});
     msg.save().then(()=>{
       io.to(user.room).emit('message', { user: user.name, text: message });
     })
