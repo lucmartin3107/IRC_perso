@@ -3,6 +3,13 @@ const express = require('express');
 const socketio = require('socket.io');
 const cors = require('cors');
 
+const mongoose = require('mongoose');
+const mongoDB = 'mongodb+srv://luc:KbROBXsrZ9umwrwh@cluster0.bts0l.mongodb.net/myFirstDatabase?retryWrites=true&w=majority';
+const Msg = require('./models/messages')
+mongoose.connect(mongoDB).then(() => {
+  console.log('connecte to mongo db')
+}).catch(err => console.log(err));
+
 const { addUser, removeUser, getUser, getUsersInRoom } = require('./users');
 
 const router = require('./router');
@@ -32,8 +39,11 @@ io.on('connect', (socket) => {
 
   socket.on('sendMessage', (message, callback) => {
     const user = getUser(socket.id);
-
-    io.to(user.room).emit('message', { user: user.name, text: message });
+    const msg = new Msg({msg:message, author:user.id, room: user.room});
+    msg.save().then(()=>{
+      io.to(user.room).emit('message', { user: user.name, text: message });
+    })
+    
 
     callback();
   });
