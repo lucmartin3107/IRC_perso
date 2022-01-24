@@ -5,7 +5,10 @@ const cors = require('cors');
 
 const mongoose = require('mongoose');
 const mongoDB = 'mongodb+srv://luc:KbROBXsrZ9umwrwh@cluster0.bts0l.mongodb.net/myFirstDatabase?retryWrites=true&w=majority';
-const Msg = require('./models/messages')
+
+const Msg = require('./models/messages');
+const Room = require('./models/rooms');
+
 mongoose.connect(mongoDB).then(() => {
   console.log('connecte to mongo db')
 }).catch(err => console.log(err));
@@ -13,6 +16,7 @@ mongoose.connect(mongoDB).then(() => {
 const { addUser, removeUser, getUser, getUsersInRoom } = require('./users');
 
 const router = require('./router');
+const { findOne } = require('./models/messages');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,15 +26,34 @@ app.use(cors());
 app.use(router);
 
 io.on('connect', (socket) => {
+  // Msg.find().then((result) => {
+  //   socket.emit('output-message', result)
+  // })
   socket.on('join', ({ name, room }, callback) => {
     const { error, user } = addUser({ id: socket.id, name, room });
-
+    
     if(error) return callback(error);
 
+     Room.countDocuments({name: room}, function (err, count){ 
+      if(count>0){
+       
+        Room.findOneAndUpdate({name: room }, {$push: { users: user.name }}, () => {})
+
+      }else {
+        const roomy = new Room({name:room});
+        console.log(roomy);
+        roomy.users.push(user.name);
+        roomy.save().then(()=>{
+        })
+
+      }
+    }); 
+
+    
     socket.join(user.room);
 
-    socket.emit('message', { user: 'admin', text: `${user.name}, welcome to room ${user.room}.`});
-    socket.broadcast.to(user.room).emit('message', { user: 'admin', text: `${user.name} has joined!` });
+    socket.emit('message', { user: 'Le modérateur', text: `${user.name}, welcome to room ${user.room}.`});
+    socket.broadcast.to(user.room).emit('message', { user: 'le modérateur', text: `${user.name} has joined!` });
 
     io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room) });
 
@@ -52,7 +75,7 @@ io.on('connect', (socket) => {
     const user = removeUser(socket.id);
 
     if(user) {
-      io.to(user.room).emit('message', { user: 'Admin', text: `${user.name} has left.` });
+      io.to(user.room).emit('message', { user: 'Le modérateur', text: `${user.name} has left.` });
       io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room)});
     }
   })
