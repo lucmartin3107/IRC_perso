@@ -55,10 +55,15 @@ io.on('connect', (socket) => {
     socket.join(user.room);
     socket.emit('message', { user: 'Le modérateur', text: `${user.name}, welcome to room ${user.room}.`});
     socket.broadcast.to(user.room).emit('message', { user: 'le modérateur', text: `${user.name} has joined!` });
-    Msg.find({room:user.room}).then((result)=> {
-      socket.emit('message', { user: `${user.name}`, text: `${result.msg}`});
-      console.log(result)
-    })
+    Msg.find({room:user.room},(err,doc)=>{
+      console.log(doc[0].msg);
+      for (let i = 0;i<doc.length;i++) {
+        socket.emit('message', { user: `${user.name}`, text: `${doc[i].msg}`});
+        console.log(doc[i].msg)
+      }
+      if(err)
+        console.log(err);
+    });
     io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room) });
     callback();
   });
