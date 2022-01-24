@@ -37,26 +37,29 @@ io.on('connect', (socket) => {
      Room.countDocuments({name: room}, function (err, count){ 
       if(count>0){
        
-        Room.findOneAndUpdate({name: room }, {$push: { users: user.name }}, () => {})
+        Room.findOneAndUpdate({name: room }, {$push: { users: user.name }}, () => {
+
+        })
 
       }else {
         const roomy = new Room({name:room});
         console.log(roomy);
         roomy.users.push(user.name);
         roomy.save().then(()=>{
+
         })
 
       }
     }); 
-
     
     socket.join(user.room);
-
     socket.emit('message', { user: 'Le modérateur', text: `${user.name}, welcome to room ${user.room}.`});
     socket.broadcast.to(user.room).emit('message', { user: 'le modérateur', text: `${user.name} has joined!` });
-
+    Msg.find({room:user.room}).then((result)=> {
+      socket.emit('message', { user: `${user.name}`, text: `${result.msg}`});
+      console.log(result)
+    })
     io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room) });
-
     callback();
   });
 
