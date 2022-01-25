@@ -1,11 +1,25 @@
-const http = require('http');
-const express = require('express');
-const socketio = require('socket.io');
-const cors = require('cors');
+const http = require("http");
+const express = require("express");
+const socketio = require("socket.io");
+const cors = require("cors");
+const mongoose = require("mongoose");
+const Date = mongoose.Date;
+const mongoDB =
+  "mongodb+srv://luc:KbROBXsrZ9umwrwh@cluster0.bts0l.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
 
-const { addUser, removeUser, getUser, getUsersInRoom } = require('./users');
+const Msg = require("./models/messages");
+const Room = require("./models/rooms");
 
-const router = require('./router');
+mongoose
+  .connect(mongoDB)
+  .then(() => {
+    console.log("connecte to mongo db");
+  })
+  .catch((err) => console.log(err));
+
+const { addUser, removeUser, getUser, getUsersInRoom } = require("./users");
+
+const router = require("./router");
 
 const app = express();
 const server = http.createServer(app);
@@ -14,38 +28,138 @@ const io = socketio(server);
 app.use(cors());
 app.use(router);
 
-io.on('connect', (socket) => {
-  socket.on('join', ({ name, room }, callback) => {
+io.on("connect", (socket) => {
+  socket.on("join", ({ name, room }, callback) => {
     const { error, user } = addUser({ id: socket.id, name, room });
 
-    if(error) return callback(error);
+    if (error) return callback(error);
+
+    Room.countDocuments({ name: room }, function (err, count) {
+      if (count > 0) {
+        if (!Room.find({$elemMatch: {users: name}})){
+          Room.findOneAndUpdate(
+            { name: room },
+            { $push: { users: user.name } },
+            () => {}
+            );
+          }
+        } else {
+        const roomy = new Room({ name: room });
+        roomy.users.push(user.name);
+        roomy.save().then(() => {});
+      }
+    });
 
     socket.join(user.room);
+    socket.emit("message", {
+      user: "Le modérateur",
+      text: `${user.name}, welcome to room ${user.room}.`,
+    });
+    socket.broadcast.to(user.room).emit("message", {
+      user: "le modérateur",
+      text: `${user.name} has joined!`,
+    });
+    Msg.find({ room: user.room }, (err, doc) => {
+      for (let i = 0; i < doc.length; i++) {
+        
+        socket.emit("message", { user: `${doc[i].author}`, text: `${doc[i].msg}` });
+      }
+      if (err) console.log(err);
+    });
+    io.to(user.room).emit("roomData", {
+      room: user.room,
+      users: getUsersInRoom(user.room),
+    });
+    callback();
+  });
 
-    socket.emit('message', { user: 'admin', text: `${user.name}, welcome to room ${user.room}.`});
-    socket.broadcast.to(user.room).emit('message', { user: 'admin', text: `${user.name} has joined!` });
+  socket.on("sendMessage", (message, callback) => {
+    const user = getUser(socket.id);  
+    const msg = new Msg({
+      msg: message,
+      author: user.name,
+      room: user.room,
+    });
 
-    io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room) });
+    if (message.includes('/nick')) {
+      let str = message.substr(6);
+      if (str !== "") {
+        Room.findOneAndUpdate(
+          { name: user.room },
+          { $pull: { users: user.name }},
+          () => {}
+        );
+        Room.findOneAndUpdate(
+          { name: user.room },
+          { $push: { users: str }},
+          () => {}
+        );
+        Msg.find({ room: user.room }, (err, doc) => {
+          for (let i = 0; i < doc.length; i++) {
+            // console.log(doc[i])
+          }
+          if (err) console.log(err);
+        });
+
+        console.log(user.room)
+        user.name = str;
+      }
+      else {
+        socket.emit("message", {
+          user: "Le modérateur",
+          text: `Veuillez choisir un nom "/nick nom".`,
+        });
+      }
+    }
+    if (message === "/list") {
+
+    }
+    if (message === "/create") {
+
+    }
+    if (message === "/delete") {
+
+    }
+    if (message === "/join") {
+
+    }
+    if (message === "/quit") {
+
+    }
+    if (message === "/users") {
+      Room.findOne({ name: user.room }, (err, doc) => {
+        for (let i = 0; i < doc.users.length; i++) {
+          socket.emit("message", { user: "", text: `${doc.users[i]}` });
+        }
+        if (err) console.log(err);
+      });
+    }
+    else {
+      msg.save().then(() => {
+        io.to(user.room).emit("message", { user: user.name, text: message });
+      });
+    }
+   
 
     callback();
   });
 
-  socket.on('sendMessage', (message, callback) => {
-    const user = getUser(socket.id);
-
-    io.to(user.room).emit('message', { user: user.name, text: message });
-
-    callback();
-  });
-
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     const user = removeUser(socket.id);
 
-    if(user) {
-      io.to(user.room).emit('message', { user: 'Admin', text: `${user.name} has left.` });
-      io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room)});
+    if (user) {
+      io.to(user.room).emit("message", {
+        user: "Le modérateur",
+        text: `${user.name} has left.`,
+      });
+      io.to(user.room).emit("roomData", {
+        room: user.room,
+        users: getUsersInRoom(user.room),
+      });
     }
-  })
+  });
 });
 
-server.listen(process.env.PORT || 5000, () => console.log(`Server has started.`));
+server.listen(process.env.PORT || 5000, () =>
+  console.log(`Server has started.`)
+);
