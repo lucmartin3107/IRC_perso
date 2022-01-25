@@ -53,7 +53,7 @@ io.on('connect', (socket) => {
     }); 
     
     socket.join(user.room);
-    socket.emit('message', { user: 'Le modérateur', text: `${user.name}, welcome to room ${user.room}.`});
+    socket.emit('message', { user: 'Le modérateur', text: `${user.name}, bienvenue dans le channel ${user.room}.`});
     socket.broadcast.to(user.room).emit('message', { user: 'le modérateur', text: `${user.name} has joined!` });
     Msg.find({room:user.room}).then((result)=> {
       socket.emit('message', { user: `${user.name}`, text: `${result.msg}`});
