@@ -49,12 +49,15 @@ const Chat = ({ location }) => {
     //   }
       
     // })
-    
+    socket.on('redirect', function(destination) {
+      window.location.href = destination;
+  });
     socket.on("roomData", ({ users }) => {
       setUsers(users);
     });
 }, []);
 
+    
   const sendMessage = (event) => {
     event.preventDefault();
 

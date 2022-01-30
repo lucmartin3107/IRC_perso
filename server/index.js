@@ -36,13 +36,13 @@ io.on("connect", (socket) => {
 
     Room.countDocuments({ name: room }, function (err, count) {
       if (count > 0) {
-        if (!Room.find({$elemMatch: {users: name}})){
+
           Room.findOneAndUpdate(
             { name: room },
-            { $push: { users: user.name } },
+            { $addToSet: { users: user.name } },
             () => {}
             );
-          }
+          
         } else {
         const roomy = new Room({ name: room });
         roomy.users.push(user.name);
@@ -84,6 +84,14 @@ io.on("connect", (socket) => {
     if (message.includes('/nick')) {
       let str = message.substr(6);
       if (str !== "") {
+      //   Msg.updateMany({ 
+      //     room: user.room, 
+      //     author: user.name 
+      //   },{ 
+      //     $setOnInsert: { 
+      //       author : str 
+      //     }}
+      //  )
         Room.findOneAndUpdate(
           { name: user.room },
           { $pull: { users: user.name }},
@@ -94,14 +102,16 @@ io.on("connect", (socket) => {
           { $push: { users: str }},
           () => {}
         );
-        Msg.find({ room: user.room }, (err, doc) => {
+        Msg.find({ room: user.room, author: user.name }, (err, doc) => {
           for (let i = 0; i < doc.length; i++) {
-            // console.log(doc[i])
+            
+            doc[i].update({}, {$set: {author:str}})
+            console.log(doc[i])
           }
           if (err) console.log(err);
         });
+        
 
-        console.log(user.room)
         user.name = str;
       }
       else {
@@ -111,22 +121,114 @@ io.on("connect", (socket) => {
         });
       }
     }
-    if (message === "/list") {
+    else if (message.substr(0, 5) === '/list')
+    {
+      let str = message.substr(6);
+      if (str !== ''){
+      
+        Room.find({ name: {$regex: new RegExp(str)}},(err, doc) => {
+          for (let i = 0; i < doc.length; i++) {
+            socket.emit("message", { user: "", text: `${doc[i].name}` });
+          }
+          if (err) console.log(err);
+        });
+      } else {
+        Room.find({},(err, doc) => {
+        for (let i = 0; i < doc.length; i++) {
+          socket.emit("message", { user: "", text: `${doc[i].name}` });
+        }
+        if (err) console.log(err);
+      });
+      }
+            
+    }
+    else if (message.substr(0, 7) === '/create') {
+      let str = message.substr(8);
+      if (str !== '') {
+        if (user) { 
+          Room.countDocuments({ name: str }, function (err, count) {
+            if (count > 0) {
+                
+                Room.findOneAndUpdate(
+                  { name: str },
+                  { $addToSet: { users: user.name } },
+                  () => {}
+                  );
+
+              } else {
+              const roomy = new Room({ name: str });
+              roomy.users.push(user.name);
+              roomy.save().then(() => {});
+            }
+          });
+        }
+      }
+            
+    }
+    else if (message === "/delete") {
 
     }
-    if (message === "/create") {
+    else if (message === "/join") {
+      const { error, user } = addUser({ id: socket.id, name, room });
+
+    if (error) return callback(error);
+
+    Room.countDocuments({ name: room }, function (err, count) {
+      if (count > 0) {
+
+          Room.findOneAndUpdate(
+            { name: room },
+            { $addToSet: { users: user.name } },
+            () => {}
+            );
+          
+        } else {
+        const roomy = new Room({ name: room });
+        roomy.users.push(user.name);
+        roomy.save().then(() => {});
+      }
+    });
+
+    socket.join(user.room);
+    socket.emit("message", {
+      user: "Le modérateur",
+      text: `${user.name}, welcome to room ${user.room}.`,
+    });
+    socket.broadcast.to(user.room).emit("message", {
+      user: "le modérateur",
+      text: `${user.name} has joined!`,
+    });
+    Msg.find({ room: user.room }, (err, doc) => {
+      for (let i = 0; i < doc.length; i++) {
+        
+        socket.emit("message", { user: `${doc[i].author}`, text: `${doc[i].msg}` });
+      }
+      if (err) console.log(err);
+    });
+    io.to(user.room).emit("roomData", {
+      room: user.room,
+      users: getUsersInRoom(user.room),
+    });
+    callback();
 
     }
-    if (message === "/delete") {
+    else if (message === "/quit") {
+      const user = removeUser(socket.id);
+    if (user) {
+      io.to(user.room).emit("message", {
+        user: "Le modérateur",
+        text: `${user.name} has left.`,
+      });
+      io.to(user.room).emit("roomData", {
+        room: user.room,
+        users: getUsersInRoom(user.room),
+      });
+      var destination = '/';
+      socket.emit('redirect', destination);
+    }
 
     }
-    if (message === "/join") {
-
-    }
-    if (message === "/quit") {
-
-    }
-    if (message === "/users") {
+    else if (message === "/users") {
       Room.findOne({ name: user.room }, (err, doc) => {
         for (let i = 0; i < doc.users.length; i++) {
           socket.emit("message", { user: "", text: `${doc.users[i]}` });
