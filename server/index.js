@@ -136,20 +136,34 @@ io.on("connect", (socket) => {
 
     else if (message.substr(0, 4) === '/msg')
     {
-      let str = message.substr(5);
-      if (str !== ''){
-        const content = 'contentue bidon'
-        Room.findOne({ name: user.room }, (err, doc) => {
-          if (doc.users.includes(str) ===true) {
-            socket.emit("private message", {
-              content,
-              to: str,
-            });
-          }
+      socket.emit("private message", {
+        //           content,
+        //           to: str,
+                });
+    //   let str = message.substr(5);
+    //   const arr = str.split(' ');
+    //   let recep = arr[0];
+    //   let content = '';
 
-          if (err) console.log(err);
-        });
-      }
+    //   arr.forEach(element => {
+    //     if (element === arr[0]){}
+    //     else if (element != arr[arr.length -1]) {
+    //       content += element + ' ';
+    //     } else {
+    //       content += element;
+    //     }
+    //   });
+    //   if (str !== ''){
+    //     Room.findOne({ name: user.room }, (err, doc) => {
+    //       if (doc.users.includes(str) ===true) {
+    //         socket.emit("private message", {
+    //           content,
+    //           to: str,
+    //         });
+    //       }
+    //       if (err) console.log(err);
+    //     });
+    //   }
     }
 
     else if (message.substr(0, 7) === '/create') {
