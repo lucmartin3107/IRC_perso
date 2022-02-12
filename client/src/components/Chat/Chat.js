@@ -39,6 +39,16 @@ const Chat = ({ location }) => {
     socket.on('message', message => {
       setMessages(messages => [ ...messages, message ]);
     });
+
+    // socket.on('output-messages', data => {
+    //   if (data.length) {
+    //     data.array.forEach(element => {
+    //       setMessages(messages => [ ...messages, message ]);
+    //     });
+        
+    //   }
+      
+    // })
     
     socket.on("roomData", ({ users }) => {
       setUsers(users);
